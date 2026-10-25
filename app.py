@@ -1,31 +1,121 @@
 import streamlit as st
 import pandas as pd
-import joblib
-import os
 
-# Page configuration
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.ensemble import GradientBoostingRegressor
+
+
+# -------------------------------------------------
+# PAGE SETTINGS
+# -------------------------------------------------
+
 st.set_page_config(
     page_title="Fitness Calorie Predictor",
     page_icon="🏃",
     layout="wide"
 )
 
-# Load the trained model
+
+# -------------------------------------------------
+# TRAIN MODEL
+# -------------------------------------------------
+
 @st.cache_resource
-def load_model():
-    model_path = os.path.join(
-        os.path.dirname(__file__),
-        "best_fitness_model.pkl"
+def train_model():
+
+    # Load dataset
+    data = pd.read_csv("calories.csv")
+
+    # Remove extra spaces from column names
+    data.columns = data.columns.str.strip()
+
+    # Input features
+    X = data[
+        [
+            "Gender",
+            "Age",
+            "Height",
+            "Weight",
+            "Duration",
+            "Heart_Rate",
+            "Body_Temp"
+        ]
+    ]
+
+    # Output
+    y = data["Calories"]
+
+    # Numerical columns
+    numeric_columns = [
+        "Age",
+        "Height",
+        "Weight",
+        "Duration",
+        "Heart_Rate",
+        "Body_Temp"
+    ]
+
+    # Categorical column
+    categorical_columns = ["Gender"]
+
+    # Numerical preprocessing
+    numeric_transformer = Pipeline([
+        ("missing", SimpleImputer(strategy="median")),
+        ("scaler", StandardScaler())
+    ])
+
+    # Categorical preprocessing
+    categorical_transformer = Pipeline([
+        ("missing", SimpleImputer(strategy="most_frequent")),
+        ("encoder", OneHotEncoder(handle_unknown="ignore"))
+    ])
+
+    # Combine preprocessing
+    preprocessor = ColumnTransformer([
+        ("numbers", numeric_transformer, numeric_columns),
+        ("categories", categorical_transformer, categorical_columns)
+    ])
+
+    # Regression algorithm
+    regressor = GradientBoostingRegressor(
+        n_estimators=100,
+        max_depth=3,
+        learning_rate=0.05,
+        random_state=42
     )
 
-    with open(model_path, "rb") as file:
-        model = joblib.load(model_path)
+    # Complete pipeline
+    model = Pipeline([
+        ("preprocessing", preprocessor),
+        ("model", regressor)
+    ])
+
+    # Split dataset
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42
+    )
+
+    # Train model
+    model.fit(X_train, y_train)
 
     return model
 
-model = load_model()
 
-# Main heading
+# Train/load cached model
+model = train_model()
+
+
+# -------------------------------------------------
+# MAIN PAGE
+# -------------------------------------------------
+
 st.title("🏃 Fitness Calorie Burn Prediction System")
 
 st.write(
@@ -35,14 +125,19 @@ st.write(
 
 st.divider()
 
-# Input section
 st.header("Enter Your Information")
+
+
+# -------------------------------------------------
+# INPUT FORM
+# -------------------------------------------------
 
 with st.form("fitness_form"):
 
     col1, col2 = st.columns(2)
 
     with col1:
+
         gender = st.selectbox(
             "Gender",
             ["female", "male"]
@@ -70,6 +165,7 @@ with st.form("fitness_form"):
         )
 
     with col2:
+
         duration = st.number_input(
             "Workout Duration (minutes)",
             min_value=1.0,
@@ -96,7 +192,11 @@ with st.form("fitness_form"):
         use_container_width=True
     )
 
-# Prediction
+
+# -------------------------------------------------
+# PREDICTION
+# -------------------------------------------------
+
 if submitted:
 
     input_data = pd.DataFrame({
@@ -125,7 +225,11 @@ if submitted:
         "not a medical measurement."
     )
 
-# Footer
+
+# -------------------------------------------------
+# FOOTER
+# -------------------------------------------------
+
 st.divider()
 
 st.caption(
