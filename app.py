@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import pickle
+import joblib
 import os
 
 # Page configuration
@@ -19,7 +19,7 @@ def load_model():
     )
 
     with open(model_path, "rb") as file:
-        model = pickle.load(file)
+        model = joblib.load(model_path)
 
     return model
 
